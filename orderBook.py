@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 from dataclasses import dataclass, replace
 from typing import Sequence, Tuple, Optional, List
 from pprint import pprint
@@ -360,3 +361,83 @@ class OrderBook:
 # print(f"Purchase Bill = {bill5:.2f}, Shares Bought = {shares_bought5:d}")
 # # ob5.pretty_print_order_book()
 # ob5.display_order_book()
+
+@dataclass(frozen=True)
+class DynamicOrderBook(OrderBook):
+
+    def restore_order_book(
+        self,
+        r: float,
+        k_exp: float,
+        k_lin: float,
+        dt: float
+    ) -> OrderBook:
+        """
+        Восстанавливает книгу заявок по экспоненциальной функции.
+
+        Args:
+            r (float): Скорость восстановления книги.
+            k_exp (float): Exp Коэффициент изменения объёма заявок.
+            k_lin (float): Lin Коэффициент изменения объёма заявок.
+            dt (float): Время, прошедшее с последнего восстановления.
+
+        Returns:
+            OrderBook: Обновлённая книга заявок после восстановления.
+        """
+        # Восстановление бидов
+        new_bids = []
+        for d_s in self.descending_bids:
+            restored_shares = d_s.shares + k_exp * np.exp(-r * dt) + k_lin * dt
+            new_bids.append(DollarsAndShares(dollars=d_s.dollars, shares=int(restored_shares)))
+
+        # Восстановление асков
+        new_asks = []
+        for d_s in self.ascending_asks:
+            restored_shares = d_s.shares + k_exp * np.exp(-r * dt) + k_lin * dt
+            new_asks.append(DollarsAndShares(dollars=d_s.dollars, shares=int(restored_shares)))
+
+        return OrderBook(
+            descending_bids=new_bids,
+            ascending_asks=new_asks
+        )
+
+    def execute_dynamic_order(
+        self,
+        order_type: str,
+        price: Optional[float],
+        shares: int,
+        r: float,
+        k_exp: float,
+        k_lin: float,
+        dt: float
+    ) -> Tuple[DollarsAndShares, OrderBook, OrderBook]:
+        """
+        Исполняет ордер и восстанавливает книгу заявок после.
+
+        Args:
+            order_type (str): Тип ордера ('buy_limit', 'buy_market', 'sell_limit', 'sell_market').
+            price (float): Цена для лимитного ордера (необязательно для рыночных).
+            shares (int): Количество акций для исполнения.
+            r (float): Скорость восстановления книги.
+            k (float): Коэффициент восстановления объёма заявок.
+            dt (float): Время восстановления.
+
+        Returns:
+            Tuple[DollarsAndShares, OrderBook]: Исполненный ордер, книга заявок после исполнения, восстановленная книга заявок.
+        """
+        # Исполняем ордер
+        if order_type == 'buy_limit':
+            result, updated_book = self.buy_limit_order(price, shares)
+        elif order_type == 'buy_market':
+            result, updated_book = self.buy_market_order(shares)
+        elif order_type == 'sell_limit':
+            result, updated_book = self.sell_limit_order(price, shares)
+        elif order_type == 'sell_market':
+            result, updated_book = self.sell_market_order(shares)
+        else:
+            raise ValueError("Invalid order type. Use 'buy_limit', 'buy_market', 'sell_limit', or 'sell_market'.")
+
+        # Восстанавливаем книгу заявок
+        not_restored_book = updated_book
+        restored_book = updated_book.restore_order_book(r=r, k_exp=k_exp, k_lin=k_lin, dt=dt)
+        return result, not_restored_book, restored_book
