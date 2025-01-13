@@ -1,6 +1,10 @@
+
+from orderBook import OrderBook
 import matplotlib.pyplot as plt
 import numpy as np
 import json
+from typing import List, Tuple
+
 
 
 def display_order_book(
@@ -68,3 +72,38 @@ def to_float(
         result_arr[i][1] = float(array[i]['quantity'])
     
     return result_arr
+
+def extract_trades(
+        historical_order_books: List[OrderBook]
+    ) -> List[Tuple[int, float]]:
+        """
+        Извлекает сделки из исторических данных стаканов.
+
+        Args:
+            historical_order_books (List[OrderBook]): Список исторических ордербуков.
+
+        Returns:
+            List[Tuple[int, float]]: Список сделок [(время, объем сделки)].
+        """
+        trades = []
+
+        # Проходим по всем моментам времени
+        for t in range(1, len(historical_order_books)):
+            prev_book = historical_order_books[t - 1]
+            current_book = historical_order_books[t]
+
+            # Анализируем изменения в объемах асков
+            for prev_ask, current_ask in zip(prev_book.ascending_asks, current_book.ascending_asks):
+                if prev_ask.dollars == current_ask.dollars:
+                    diff = prev_ask.shares - current_ask.shares
+                    if diff > 0:  # Продажа
+                        trades.append((t, float(diff)))
+
+            # Анализируем изменения в объемах бидов
+            for prev_bid, current_bid in zip(prev_book.descending_bids, current_book.descending_bids):
+                if prev_bid.dollars == current_bid.dollars:
+                    diff = current_bid.shares - prev_bid.shares
+                    if diff > 0:  # Покупка
+                        trades.append((t, float(diff)))
+
+        return trades
