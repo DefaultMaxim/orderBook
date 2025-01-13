@@ -3,3 +3,6 @@ __pycache__
 *.ipynb
 *.csv
 remote
+!example.ipynb
+*.png
+pipeline.py
