@@ -6,3 +6,4 @@ remote
 !example.ipynb
 *.png
 pipeline.py
+!results.png

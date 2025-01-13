@@ -294,21 +294,22 @@ class OrderBook:
         bid_shares = [d_s.shares for d_s in self.descending_bids]
         
         if self.descending_bids:
-            plt.bar(bid_prices, bid_shares, color='blue', width=0.01)
+            plt.bar(bid_prices, bid_shares, color='blue', width=0.008, label='Покупки')
 
         ask_prices = [d_s.dollars for d_s in self.ascending_asks]
         ask_shares = [d_s.shares for d_s in self.ascending_asks]
         
         if self.ascending_asks:
-            plt.bar(ask_prices, ask_shares, color='red', width=0.01)
+            plt.bar(ask_prices, ask_shares, color='red', width=0.008, label='Продажи')
 
         # all_prices = sorted(bid_prices + ask_prices)
         # all_ticks = ["%d" % x for x in all_prices]
         # plt.xticks(all_prices, all_ticks)
         plt.grid(axis='y')
-        plt.xlabel("Prices")
-        plt.ylabel("Number of Shares")
-        plt.title("Order Book")
+        plt.xlabel("Цены", fontsize=15)
+        plt.legend(fontsize=15)
+        plt.ylabel("Объемы", fontsize=15)
+        # plt.title("Order Book")
         # plt.xticks(x_pos, x)
         plt.show()
         
@@ -373,32 +374,39 @@ class DynamicOrderBook(OrderBook):
         dt: float
     ) -> OrderBook:
         """
-        Восстанавливает книгу заявок по экспоненциальной функции.
+        Восстанавливает книгу заявок по динамике, описанной в статье:
+        экспоненциальное восстановление ликвидности.
 
         Args:
-            r (float): Скорость восстановления книги.
-            k_exp (float): Exp Коэффициент изменения объёма заявок.
-            k_lin (float): Lin Коэффициент изменения объёма заявок.
+            r (float): Скорость восстановления книги (resilience).
+            k_exp (float): Экспоненциальный коэффициент восстановления.
+            k_lin (float): Линейный коэффициент восстановления.
             dt (float): Время, прошедшее с последнего восстановления.
 
         Returns:
             OrderBook: Обновлённая книга заявок после восстановления.
         """
         # Восстановление бидов
-        new_bids = []
-        for d_s in self.descending_bids:
-            restored_shares = d_s.shares + k_exp * np.exp(-r * dt) + k_lin * dt
-            new_bids.append(DollarsAndShares(dollars=d_s.dollars, shares=int(restored_shares)))
+        restored_bids = [
+            DollarsAndShares(
+                dollars=d_s.dollars,
+                shares=int(d_s.shares + k_exp * np.exp(-r * dt) + k_lin * dt)
+            )
+            for d_s in self.descending_bids
+        ]
 
         # Восстановление асков
-        new_asks = []
-        for d_s in self.ascending_asks:
-            restored_shares = d_s.shares + k_exp * np.exp(-r * dt) + k_lin * dt
-            new_asks.append(DollarsAndShares(dollars=d_s.dollars, shares=int(restored_shares)))
+        restored_asks = [
+            DollarsAndShares(
+                dollars=d_s.dollars,
+                shares=int(d_s.shares + k_exp * np.exp(-r * dt) + k_lin * dt)
+            )
+            for d_s in self.ascending_asks
+        ]
 
         return OrderBook(
-            descending_bids=new_bids,
-            ascending_asks=new_asks
+            descending_bids=restored_bids,
+            ascending_asks=restored_asks
         )
 
     def execute_dynamic_order(
@@ -412,20 +420,23 @@ class DynamicOrderBook(OrderBook):
         dt: float
     ) -> Tuple[DollarsAndShares, OrderBook, OrderBook]:
         """
-        Исполняет ордер и восстанавливает книгу заявок после.
+        Исполняет ордер и восстанавливает книгу заявок после исполнения.
 
         Args:
             order_type (str): Тип ордера ('buy_limit', 'buy_market', 'sell_limit', 'sell_market').
-            price (float): Цена для лимитного ордера (необязательно для рыночных).
+            price (float): Цена для лимитного ордера (опционально для рыночных).
             shares (int): Количество акций для исполнения.
             r (float): Скорость восстановления книги.
-            k (float): Коэффициент восстановления объёма заявок.
-            dt (float): Время восстановления.
+            k_exp (float): Экспоненциальный коэффициент восстановления объёма.
+            k_lin (float): Линейный коэффициент восстановления объёма.
+            dt (float): Интервал времени восстановления.
 
         Returns:
-            Tuple[DollarsAndShares, OrderBook]: Исполненный ордер, книга заявок после исполнения, восстановленная книга заявок.
+            Tuple[DollarsAndShares, OrderBook, OrderBook]: 
+                - Исполненный ордер,
+                - Книга заявок после исполнения (до восстановления),
+                - Книга заявок после восстановления.
         """
-        # Исполняем ордер
         if order_type == 'buy_limit':
             result, updated_book = self.buy_limit_order(price, shares)
         elif order_type == 'buy_market':
@@ -437,7 +448,40 @@ class DynamicOrderBook(OrderBook):
         else:
             raise ValueError("Invalid order type. Use 'buy_limit', 'buy_market', 'sell_limit', or 'sell_market'.")
 
-        # Восстанавливаем книгу заявок
-        not_restored_book = updated_book
         restored_book = updated_book.restore_order_book(r=r, k_exp=k_exp, k_lin=k_lin, dt=dt)
-        return result, not_restored_book, restored_book
+        return result, updated_book, restored_book
+    
+    def extract_trades(
+        historical_order_books: List[OrderBook]
+    ) -> List[Tuple[int, float]]:
+        """
+        Извлекает сделки из исторических данных стаканов.
+
+        Args:
+            historical_order_books (List[OrderBook]): Список исторических ордербуков.
+
+        Returns:
+            List[Tuple[int, float]]: Список сделок [(время, объем сделки)].
+        """
+        trades = []
+
+        # Проходим по всем моментам времени
+        for t in range(1, len(historical_order_books)):
+            prev_book = historical_order_books[t - 1]
+            current_book = historical_order_books[t]
+
+            # Анализируем изменения в объемах асков
+            for prev_ask, current_ask in zip(prev_book.ascending_asks, current_book.ascending_asks):
+                if prev_ask.dollars == current_ask.dollars:
+                    diff = prev_ask.shares - current_ask.shares
+                    if diff > 0:  # Продажа
+                        trades.append((t, float(diff)))
+
+            # Анализируем изменения в объемах бидов
+            for prev_bid, current_bid in zip(prev_book.descending_bids, current_book.descending_bids):
+                if prev_bid.dollars == current_bid.dollars:
+                    diff = current_bid.shares - prev_bid.shares
+                    if diff > 0:  # Покупка
+                        trades.append((t, float(diff)))
+
+        return trades
