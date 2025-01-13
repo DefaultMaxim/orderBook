@@ -26,6 +26,6 @@
   - В конце создается заключительная крупная заявка для реализации оставшейся части активов.
 ---
 # Результаты:
-![Результаты моделирования аск прайса:](https://github.com/jon/coolproject/raw/master/image/image.png)
-
-![Image alt](https://github.com/{username}/{repository}/raw/{branch}/{path}/image.png)
+На рисунках ниже можно видеть, что модель в общем неплохо предсказывает тренд аск цены.
+![Результаты моделирования аск прайса:](https://github.com/DefaultMaxim/orderBook/blob/main/images/results.png)
+![Результаты моделирования аск прайса:](https://github.com/DefaultMaxim/orderBook/blob/main/images/results2.png)
