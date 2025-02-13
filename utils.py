@@ -1,5 +1,7 @@
 
-from orderBook import OrderBook
+import __future__
+
+from orderBook import OrderBook, DynamicOrderBook, DollarsAndShares
 import matplotlib.pyplot as plt
 import numpy as np
 import json
@@ -107,3 +109,40 @@ def extract_trades(
                         trades.append((t, float(diff)))
 
         return trades
+    
+def load_data(
+        df
+    ) -> List[DynamicOrderBook]:
+        """
+        Gets market data from json to list orderbooks
+
+        Returns:
+            pd.DataFrame: _description_
+        """
+        
+        df.bids = df.bids.apply(to_json).apply(to_float)
+        df.asks = df.asks.apply(to_json).apply(to_float)
+        
+        bids = []
+        asks = []
+
+        for i in range(len(df)):
+            
+            bids.append([DollarsAndShares(
+                    dollars=x[0],
+                    shares=x[1]
+                ) for x in df.bids.iloc[i]])
+            
+            asks.append([DollarsAndShares(
+                dollars=x[0],
+                shares=x[1]
+            ) for x in df.asks.iloc[i]])
+            
+        order_books = [
+            DynamicOrderBook(
+                descending_bids=bids[i], 
+                ascending_asks=asks[i]
+                ) for i in range(len(df))
+            ]
+        
+        return order_books
