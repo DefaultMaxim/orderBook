@@ -6,7 +6,30 @@
 - Моделей, описывающих динамику восстановления стакана.
 - Калибровки параметров для данных моделей.
 - Реализованных методов для работы с биржевыми стаканами.
-  
+---
+# Запуск и тестирование:
+
+Модель можно протестировть скачав репозиторий
+```
+git clone https://github.com/DefaultMaxim/orderBook.git
+cd https://github.com/DefaultMaxim/orderBook.git
+```
+Создать виртуальное окружение на линукс подобную систему:
+```
+python -m venv venv
+source venv/bin/actiavte
+```
+На windows подобную систему:
+```
+python -m venv venv
+venv/scripts/actiavte
+```
+Установить зависимости:
+```
+pip install -r requirements.txt
+```
+Затем запустить файл __example.ipynb__.
+
 ---
 
 # Подход, предложенный Обижаевой и Ванг
