@@ -404,7 +404,7 @@ class DynamicOrderBook(OrderBook):
             for d_s in self.ascending_asks
         ]
 
-        return OrderBook(
+        return self.__class__(
             descending_bids=restored_bids,
             ascending_asks=restored_asks
         )

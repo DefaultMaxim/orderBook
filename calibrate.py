@@ -10,7 +10,8 @@ def calculate_ask_price(
     k: float,
     r: float,
     s: float,
-    V_t
+    V_t,
+    k_exp=1.0, k_lin=0.0,
 ):
     """
     Рассчитываем теоретический аск-прайс в момент времени t,
